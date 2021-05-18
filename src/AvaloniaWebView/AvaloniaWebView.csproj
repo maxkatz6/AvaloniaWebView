@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net5.0;net5.0-windows7</TargetFrameworks>
+    <UseWindowsForms Condition="'$(TargetFramework)' == 'net5.0-windows7'">true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="0.10.0" />
+    <PackageReference Condition="'$(TargetFramework)' != 'net5.0-windows7'" Include="MonoMac.NetStandard" Version="0.0.4" />
+  </ItemGroup>
+</Project>
