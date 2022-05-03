@@ -1,12 +1,23 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;net5.0;net5.0-windows7</TargetFrameworks>
-    <UseWindowsForms Condition="'$(TargetFramework)' == 'net5.0-windows7'">true</UseWindowsForms>
+    <TargetFrameworks>net6.0</TargetFrameworks>
+    <TargetFrameworks Condition=" '$(OS)' == 'Windows_NT' ">$(TargetFrameworks);net6.0-windows</TargetFrameworks>
+    <UseWindowsForms Condition="'$(TargetFramework)' == 'net6.0-windows'">true</UseWindowsForms>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <!-- Common group -->
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="0.10.0" />
-    <PackageReference Condition="'$(TargetFramework)' != 'net5.0-windows7'" Include="MonoMac.NetStandard" Version="0.0.4" />
+    <PackageReference Include="Avalonia" Version="0.10.11" />
+  </ItemGroup>
+  <!-- Windows only group -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0-windows'">
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.864.35" />
+  </ItemGroup>
+  <!-- Unknown platform group (macOS, linux) -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
+    <PackageReference Include="MonoMac.NetStandard" Version="0.0.4" />
+    <PackageReference Include="WebkitGtkSharp" Version="3.24.24.38" />
   </ItemGroup>
 </Project>

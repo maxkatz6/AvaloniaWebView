@@ -1,36 +1,47 @@
 ﻿using System;
-
+using System.Threading.Tasks;
+using Avalonia.Input;
 using Avalonia.Platform;
 
-namespace AvaloniaWebBrowser
+namespace AvaloniaWebView;
+
+public class WebViewNavigationEventArgs : EventArgs
 {
-    internal interface IWebView
-    {
-        event EventHandler NavigationCompleted;
+    public Uri? Request { get; init; }
+}
 
-        bool CanGoBack { get; }
+internal interface IWebView
+{
+    event EventHandler<WebViewNavigationEventArgs>? NavigationCompleted;
 
-        bool CanGoForward { get; }
+    event EventHandler<WebViewNavigationEventArgs>? NavigationStarted;
 
-        Uri Source { get; set; }
+    bool CanGoBack { get; }
 
-        bool GoBack();
+    bool CanGoForward { get; }
 
-        bool GoForward();
+    Uri? Source { get; set; }
 
-        string? InvokeScript(string scriptName);
+    bool GoBack();
 
-        void Navigate(Uri url);
+    bool GoForward();
 
-        void NavigateToString(string text);
+    string? InvokeScript(string scriptName);
 
-        void Refresh();
+    void Navigate(Uri url);
 
-        void Stop();
-    }
+    Task NavigateToString(string text);
 
-    internal interface IWebViewAdapter : IWebView
-    {
-        IPlatformHandle PlatformHandle { get; }
-    }
+    void Refresh();
+
+    void Stop();
+}
+
+internal interface IWebViewAdapter : IWebView
+{
+    IPlatformHandle PlatformHandle { get; }
+
+    void HandleResize(int width, int height, float zoom);
+
+    bool HandleKeyDown(Key key, KeyModifiers keyModifiers);
 }
