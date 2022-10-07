@@ -1,7 +1,7 @@
 ﻿<Project>
 
   <PropertyGroup>
-    <LangVersion>10.0</LangVersion>
+    <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <Features>strict</Features>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
@@ -10,6 +10,8 @@
     <AnalysisLevel>preview</AnalysisLevel>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <AvaloniaVersion>11.0</AvaloniaVersion>
   </PropertyGroup>
 
   <PropertyGroup>

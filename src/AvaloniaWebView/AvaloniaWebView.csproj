@@ -1,23 +1,29 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net6.0</TargetFrameworks>
-    <TargetFrameworks Condition=" '$(OS)' == 'Windows_NT' ">$(TargetFrameworks);net6.0-windows</TargetFrameworks>
-    <UseWindowsForms Condition="'$(TargetFramework)' == 'net6.0-windows'">true</UseWindowsForms>
+    <TargetFrameworks>net7.0;net7.0-windows10.0.22621</TargetFrameworks>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <!-- Common group -->
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="0.10.11" />
+    <PackageReference Include="Avalonia" Version="11.0" />
   </ItemGroup>
+
   <!-- Windows only group -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0-windows'">
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.864.35" />
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.902.49" />
+    <PackageReference Include="Dongle.WindowsSDK.NET" Version="10.0.22621.756" />
   </ItemGroup>
-  <!-- Unknown platform group (macOS, linux) -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
-    <PackageReference Include="MonoMac.NetStandard" Version="0.0.4" />
-    <PackageReference Include="WebkitGtkSharp" Version="3.24.24.38" />
+
+  <!-- macOS only group -->
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'macos'">
+<!--    <PackageReference Include="MonoMac.NetStandard" Version="0.0.4" />-->
+  </ItemGroup>
+
+  <!-- Unknown platform group (linux + browser) -->
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == ''">
+    <PackageReference Include="WebkitGtkSharp" Version="3.24.24.95" />
+    <PackageReference Include="Avalonia.Browser" Version="11.0" />
   </ItemGroup>
 </Project>

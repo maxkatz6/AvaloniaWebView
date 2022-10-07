@@ -1,11 +1,15 @@
-﻿namespace AvaloniaWebView;
+﻿using System;
+
+namespace AvaloniaWebView;
 
 public class WebViewCapabilities
 {
-    private static bool? _isWebView2Available;
-    public static bool IsWebView2Available => _isWebView2Available ??= IsWebView2AvailableInternal();
+    private static bool? _isMsWebView2Available;
+    public static bool IsMsWebView2Available => _isMsWebView2Available ??= IsMsWebView2AvailableInternal();
 
-    private static bool IsWebView2AvailableInternal()
+    public static bool IsMsWebView1Available => OperatingSystem.IsWindowsVersionAtLeast(10, 0, 17134);
+
+    private static bool IsMsWebView2AvailableInternal()
     {
 #if WINDOWS
         try

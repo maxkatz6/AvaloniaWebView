@@ -1,14 +1,14 @@
-﻿#if !WINDOWS
+﻿#if MACOS
 using System;
 using System.Threading.Tasks;
-
+using Avalonia;
 using Avalonia.Input;
 using Avalonia.Platform;
 
 using MonoMac.AppKit;
 using MonoMac.Foundation;
 
-namespace AvaloniaWebView;
+namespace AvaloniaWebView.Mac;
 
 internal sealed class MacWebViewAdapter : IWebViewAdapter, IDisposable
 {
@@ -19,7 +19,7 @@ internal sealed class MacWebViewAdapter : IWebViewAdapter, IDisposable
         _webView = new MonoMac.WebKit.WebView();
 
         _webView.FinishedLoad += (s, a) => NavigationCompleted?
-            .Invoke(this, new WebViewNavigationEventArgs() { Request = new Uri(_webView.MainFrameUrl) });
+            .Invoke(this, new WebViewNavigationCompletedEventArgs() { Request = new Uri(_webView.MainFrameUrl) });
     }
 
     public bool CanGoBack => _webView.CanGoBack();
@@ -28,10 +28,13 @@ internal sealed class MacWebViewAdapter : IWebViewAdapter, IDisposable
 
     public Uri Source { get => new(_webView.MainFrameUrl); set => _webView.MainFrameUrl = value.OriginalString; }
 
+    public bool IsInitialized => true;
     public IPlatformHandle PlatformHandle => new MacViewHandle(_webView);
 
-    public event EventHandler<WebViewNavigationEventArgs>? NavigationCompleted;
-    public event EventHandler<WebViewNavigationEventArgs>? NavigationStarted;
+    public event EventHandler<WebViewNavigationCompletedEventArgs>? NavigationCompleted;
+    public event EventHandler<WebViewNavigationStartingEventArgs>? NavigationStarted;
+    public event EventHandler<WebViewNavigationWebPageRequestedEventArgs>? WebPageRequested;
+    public event EventHandler? Initialized;
 
     public void Dispose() => _webView.Dispose();
 
@@ -39,28 +42,27 @@ internal sealed class MacWebViewAdapter : IWebViewAdapter, IDisposable
 
     public bool GoForward() => _webView.GoForward();
 
-    public bool HandleKeyDown(Key key, KeyModifiers keyModifiers)
-    {
-        return false;
-    }
-
-    public void HandleResize(int width, int height, float zoom)
+    public void HandleResize(PixelSize size)
     {
     }
 
-    public string InvokeScript(string script) => _webView.StringByEvaluatingJavaScriptFromString(script);
+    public Task<string> InvokeScript(string script) => Task.FromResult(_webView.StringByEvaluatingJavaScriptFromString(script));
 
     public void Navigate(Uri url) => _webView.MainFrame.LoadRequest(new NSUrlRequest(new NSUrl(url.AbsolutePath)));
 
-    public Task NavigateToString(string text)
+    public void NavigateToString(string text) => _webView.MainFrame.LoadHtmlString(text, null);
+
+    public bool Refresh()
     {
-        _webView.MainFrame.LoadHtmlString(text, null);
-        return Task.CompletedTask;
+        _webView.MainFrame.Reload();
+        return true;
     }
 
-    public void Refresh() => _webView.MainFrame.Reload();
-
-    public void Stop() => _webView.MainFrame.StopLoading();
+    public bool Stop()
+    {
+        _webView.MainFrame.StopLoading();
+        return true;
+    }
 }
 
 internal class MacViewHandle : IPlatformHandle, IDisposable

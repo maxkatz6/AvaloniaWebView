@@ -1,53 +1,45 @@
 using System;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Platform;
+using Avalonia.Threading;
+using AvaloniaWebView.Browser;
 
 namespace AvaloniaWebView;
 
-
 public class NativeWebView : NativeControlHost, IWebView
 {
+    private static readonly Uri s_emptyPageLink = new("about:blank");
+    
     private IWebViewAdapter? _webViewAdapter;
-    private Uri? _delayedSource;
     private TaskCompletionSource _webViewReadyCompletion = new();
 
-    public event EventHandler<WebViewNavigationEventArgs>? NavigationCompleted;
+    public event EventHandler<WebViewNavigationCompletedEventArgs>? NavigationCompleted;
 
-    public event EventHandler<WebViewNavigationEventArgs>? NavigationStarted;
+    public event EventHandler<WebViewNavigationStartingEventArgs>? NavigationStarted;
+    
+    public event EventHandler<WebViewNavigationWebPageRequestedEventArgs>? WebPageRequested;
 
+    public static readonly StyledProperty<Uri?> SourceProperty = AvaloniaProperty.Register<NativeWebView, Uri?>(nameof(Source));
+
+    public Uri? Source
+    {
+        get => GetValue(SourceProperty);
+        set => SetValue(SourceProperty, value);
+    }
+    
     public bool CanGoBack => _webViewAdapter?.CanGoBack ?? false;
 
     public bool CanGoForward => _webViewAdapter?.CanGoForward ?? false;
 
-    public Uri? Source
-    {
-        get => _webViewAdapter?.Source ?? throw new InvalidOperationException("Control was not initialized");
-        set
-        {
-            if (_webViewAdapter is null)
-            {
-                _delayedSource = value;
-                return;
-            }
-            _webViewAdapter.Source = value;
-        }
-    }
+    public bool GoBack() => _webViewAdapter?.GoBack() ?? false;
 
-    public bool GoBack()
-    {
-        return _webViewAdapter?.GoBack() ?? throw new InvalidOperationException("Control was not initialized");
-    }
+    public bool GoForward() => _webViewAdapter?.GoForward() ?? false;
 
-    public bool GoForward()
-    {
-        return _webViewAdapter?.GoForward() ?? throw new InvalidOperationException("Control was not initialized");
-    }
-
-    public string? InvokeScript(string scriptName)
+    public Task<string?> InvokeScript(string scriptName)
     {
         return _webViewAdapter is null
             ? throw new InvalidOperationException("Control was not initialized")
@@ -60,69 +52,68 @@ public class NativeWebView : NativeControlHost, IWebView
             .Navigate(url);
     }
 
-    public Task NavigateToString(string text)
+    public void NavigateToString(string text)
     {
-        return (_webViewAdapter ?? throw new InvalidOperationException("Control was not initialized"))
+        (_webViewAdapter ?? throw new InvalidOperationException("Control was not initialized"))
             .NavigateToString(text);
     }
 
-    public void Refresh()
-    {
-        (_webViewAdapter ?? throw new InvalidOperationException("Control was not initialized"))
-            .Refresh();
-    }
+    public bool Refresh() => _webViewAdapter?.Refresh() ?? false;
 
-    public void Stop()
-    {
-        (_webViewAdapter ?? throw new InvalidOperationException("Control was not initialized"))
-            .Stop();
-    }
-
-    public Task WaitForNativeHost()
-    {
-        return _webViewReadyCompletion.Task;
-    }
+    public bool Stop() => _webViewAdapter?.Stop() ?? false;
 
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
     {
-        IPlatformHandle handle;
-#if WINDOWS
-        _webViewAdapter = WebViewCapabilities.IsWebView2Available
-            ? new WindowsWebView2Adapter()
-            : new WindowsWebBrowserAdapter();
-        SubscribeOnEvents();
-        handle = _webViewAdapter.PlatformHandle;
-#else
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                throw new NotSupportedException("Only NET6.0-WINDOWS Nuget package is supported on Windows OS.");
-            }
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                _webViewAdapter = new GtkWebView2Adapter();
-                SubscribeOnEvents();
-                handle = _webViewAdapter.PlatformHandle;
-            }
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                _webViewAdapter = new MacWebViewAdapter();
-                SubscribeOnEvents();
-                handle = _webViewAdapter.PlatformHandle;
-            }
-            else
-            {
-                return base.CreateNativeControlCore(parent);
-            }
-#endif
-
-        if (_delayedSource is not null)
+        if (Design.IsDesignMode)
         {
-            _webViewAdapter.Source = _delayedSource;
+            return base.CreateNativeControlCore(parent);
         }
 
-        _webViewReadyCompletion.TrySetResult();
+#if WINDOWS
+        if (WebViewCapabilities.IsMsWebView2Available)
+        {
+            _webViewAdapter = new Win.WebView2Adapter(base.CreateNativeControlCore(parent));
+        }
+        else if (WebViewCapabilities.IsMsWebView1Available)
+        {
+            _webViewAdapter = new Win.WebView1Adapter(base.CreateNativeControlCore(parent));
+        }
+        else
+        {
+            return base.CreateNativeControlCore(parent);
+        }
+#elif MACOS
+        if (OperatingSystem.IsMacOS())
+        {
+            _webViewAdapter = new Mac.MacWebViewAdapter();
+        }
+#else
+        if (OperatingSystem.IsLinux())
+        {
+            _webViewAdapter = new Gtk.GtkWebView2Adapter();
+        }
+        else if (OperatingSystem.IsBrowser())
+        {
+            _webViewAdapter = new BrowserIFrameAdapter();
+        }
+        else
+        {
+            return base.CreateNativeControlCore(parent);
+        }
+#endif
 
-        return handle;
+        SubscribeOnEvents();
+        
+        if (_webViewAdapter.IsInitialized)
+        {
+            WebViewAdapterOnInitialized(_webViewAdapter, EventArgs.Empty);
+        }
+        else
+        {
+            _webViewAdapter.Initialized += WebViewAdapterOnInitialized;
+        }
+
+        return _webViewAdapter;
     }
 
     private void SubscribeOnEvents()
@@ -131,49 +122,68 @@ public class NativeWebView : NativeControlHost, IWebView
         {
             _webViewAdapter.NavigationStarted += WebViewAdapterOnNavigationStarted;
             _webViewAdapter.NavigationCompleted += WebViewAdapterOnNavigationCompleted;
+            _webViewAdapter.WebPageRequested += WebViewAdapterOnWebPageRequested;
         }
     }
 
-    private void WebViewAdapterOnNavigationStarted(object? sender, WebViewNavigationEventArgs e)
+    private void WebViewAdapterOnNavigationStarted(object? sender, WebViewNavigationStartingEventArgs e)
     {
         NavigationStarted?.Invoke(this, e);
     }
 
-    private void WebViewAdapterOnNavigationCompleted(object? sender, WebViewNavigationEventArgs e)
+    private void WebViewAdapterOnNavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs e)
     {
+        SetCurrentValue(SourceProperty, e.Request);
         NavigationCompleted?.Invoke(this, e);
     }
 
-    protected override void OnPropertyChanged<T>(AvaloniaPropertyChangedEventArgs<T> change)
+    private void WebViewAdapterOnWebPageRequested(object? sender, WebViewNavigationWebPageRequestedEventArgs e)
+    {
+        WebPageRequested?.Invoke(this, e);
+    }
+    
+    private void WebViewAdapterOnInitialized(object? sender, EventArgs e)
+    {
+        var adapter = (IWebViewAdapter)sender!;
+        adapter.Initialized -= WebViewAdapterOnInitialized;
+        adapter.Source = Source;
+
+        _webViewReadyCompletion.TrySetResult();
+    }
+    
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
 
-        if (change.Property == BoundsProperty)
+        if (change.Property == SourceProperty)
         {
-            var newValue = change.NewValue.GetValueOrDefault<Rect>();
-            var scaling = (float)(VisualRoot?.RenderScaling ?? 1.0f);
-            _webViewAdapter?.HandleResize((int)(newValue.Width * scaling), (int)(newValue.Height * scaling), scaling);
+            if (_webViewAdapter is not null)
+            {
+                _webViewAdapter.Source = change.GetNewValue<Uri>();
+            }
         }
-    }
-
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        if (_webViewAdapter != null)
+        else if (change.Property == BoundsProperty)
         {
-            e.Handled = _webViewAdapter.HandleKeyDown(e.Key, e.KeyModifiers);
+            _webViewAdapter?.SizeChanged();
         }
-
-        base.OnKeyDown(e);
     }
 
     protected override void DestroyNativeControlCore(IPlatformHandle control)
+    {
+        DestroyWebViewAdapter();
+    }
+
+    private void DestroyWebViewAdapter()
     {
         if (_webViewAdapter is not null)
         {
             _webViewReadyCompletion = new TaskCompletionSource();
             _webViewAdapter.NavigationStarted -= WebViewAdapterOnNavigationStarted;
             _webViewAdapter.NavigationCompleted -= WebViewAdapterOnNavigationCompleted;
+            _webViewAdapter.WebPageRequested -= WebViewAdapterOnWebPageRequested;
+            _webViewAdapter.Initialized -= WebViewAdapterOnInitialized;
             (_webViewAdapter as IDisposable)?.Dispose();
+            _webViewAdapter = null;
         }
     }
 }
