@@ -1,54 +1,82 @@
-﻿#if !WINDOWS && !MACOS
+﻿#if DISABLE
 using System;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.X11.Interop;
 using GLib;
+using Gtk;
+
+using static Avalonia.X11.Interop.GtkInteropHelper;
 using Application = Gtk.Application;
 
 namespace AvaloniaWebView.Gtk;
 
+[SupportedOSPlatform("linux")]
 internal class GtkWebView2Adapter : IWebViewAdapter
 {
-    private readonly WebKit.WebView _webView;
-    private readonly global::Gtk.Window _window;
+    private WebKit.WebView _webView;
+    private global::Gtk.Window _window;
     private static Task<IntPtr>? s_gtkTask;
-    private readonly SynchronizationContext _gtkContext;
+    private readonly SynchronizationContext? _gtkContext;
 
-    [DllImport("libgdk-3.so.0")]
+    [DllImport("libgdk-3.so.0", CallingConvention = CallingConvention.Cdecl)]
     public static extern IntPtr gdk_x11_window_get_xid(IntPtr window);
 
     public GtkWebView2Adapter()
     {
-        var avContext = SynchronizationContext.Current;
-
-        try
+        RunOnGlibThread(() =>
         {
-            Application.Init();
-            _gtkContext = SynchronizationContext.Current;
+            var window = new Window(WindowType.Toplevel);
 
-            var app = new Application($"avalonia.webview.{Guid.NewGuid():N}", ApplicationFlags.None);
 
-            _window = new global::Gtk.Window(global::Gtk.WindowType.Toplevel);
-            _window.Title = nameof(GtkWebView2Adapter);
-            _window.KeepAbove = true;
-            app.AddWindow(_window);
+            var webView = new WebKit.WebView();
+            webView.LoadUri("http://www.google.com/");
+            window.Add(webView);
 
-            _webView = new WebKit.WebView();
-            _webView.Realize();
-            _window.Add(_webView);
-            _window.ShowAll();
-            _window.Present();
+            window.ShowAll();
 
-            Handle = gdk_x11_window_get_xid(_window.Handle);
-        }
-        finally
-        {
-            SynchronizationContext.SetSynchronizationContext(avContext);
-        }
+            //var window = new global::Gtk.Window(nameof(GtkWebView2Adapter));
+            //window.KeepAbove = true;
+
+            //// ((Application)GLib.Application.Default).AddWindow(window);
+
+            //var webView = new WebKit.WebView();
+            //var a = WebKit.Global.IsSupported;
+            //Fixed fix = new Fixed();
+
+            //Button btn1 = new Button("Button");
+            //btn1.Sensitive = false;
+            //Button btn2 = new Button("Button");
+            //Button btn3 = new Button(Stock.Close);
+            //Button btn4 = new Button("Button");
+            //webView.SetSizeRequest(80, 40);
+
+            //fix.Put(btn1, 20, 30);
+            //fix.Put(btn2, 100, 30);
+            //fix.Put(btn3, 20, 80);
+            //fix.Put(btn4, 100, 80);
+
+            //window.Add(webView);
+
+
+            //Button btn = new Button("Hello World");
+            //webView.LoadUri("http://www.google.com/");
+            //// window.Add(webView);
+            //window.Realize();
+            ////window.Add(btn);
+            //window.SetDefaultSize(500, 500);
+            //window.SetPosition(WindowPosition.Center);
+            //window.ShowAll();
+            //window.Present();
+
+            // var handle = gdk_x11_window_get_xid(window.GdkWindow.Handle);
+            return 0;
+        });
     }
 
-    public IntPtr Handle { get; }
+    public IntPtr Handle { get; private set; }
     public string HandleDescriptor => "XID";
 
     public bool IsInitialized => true;
@@ -61,12 +89,11 @@ internal class GtkWebView2Adapter : IWebViewAdapter
     public Uri Source
     {
         get => RunOnGlibThread(() => new Uri(_webView.Uri)).Result;
-        set => RunOnGlibThread(() => _webView.LoadUri(value?.AbsolutePath)).Wait();
+        set => RunOnGlibThread(() => { _webView.LoadUri(value?.AbsolutePath); return 0; }).Wait();
     }
 
     public event EventHandler<WebViewNavigationCompletedEventArgs>? NavigationCompleted;
     public event EventHandler<WebViewNavigationStartingEventArgs>? NavigationStarted;
-    public event EventHandler<WebViewNavigationWebPageRequestedEventArgs>? WebPageRequested;
     public event EventHandler? Initialized;
 
     public void Dispose()
@@ -75,6 +102,7 @@ internal class GtkWebView2Adapter : IWebViewAdapter
         {
             _webView.Window?.Dispose();
             _webView.Dispose();
+            return 0;
         }).Wait();
     }
 
@@ -107,7 +135,7 @@ internal class GtkWebView2Adapter : IWebViewAdapter
 
     public void Navigate(Uri url)
     {
-        RunOnGlibThread(() => _webView.LoadUri(url.AbsolutePath)).Wait();
+        RunOnGlibThread(() => { _webView.LoadUri(url.AbsolutePath); return 0; }).Wait();
     }
 
     public void NavigateToString(string text)
@@ -115,64 +143,18 @@ internal class GtkWebView2Adapter : IWebViewAdapter
         RunOnGlibThread(() =>
         {
             _webView.LoadHtml(text);
+            return 0;
         }).Wait();
     }
 
     public bool Refresh()
     {
-        RunOnGlibThread(() => _webView.Reload()).Wait();
-        return true;
+        return RunOnGlibThread(() => { _webView.Reload(); return true; }).GetAwaiter().GetResult();
     }
 
     public bool Stop()
     {
-        RunOnGlibThread(() => _webView.StopLoading()).Wait();
-        return true;
-    }
-    
-    private Task<T> RunOnGlibThread<T>(Func<T> action)
-    {
-        var tcs = new TaskCompletionSource<T>();
-        _gtkContext.Post(static arg =>
-        {
-            var (tcs, action) = (ValueTuple<TaskCompletionSource<T>, Func<T>>)arg!;
-            try
-            {
-                tcs.TrySetResult(action());
-            }
-            catch (OperationCanceledException)
-            {
-                tcs.TrySetCanceled();
-            }
-            catch (Exception ex)
-            {
-                tcs.TrySetException(ex);
-            }
-        }, (tcs, action));
-        return tcs.Task;
-    }
-    
-    private System.Threading.Tasks.Task RunOnGlibThread(Action action)
-    {
-        var tcs = new TaskCompletionSource();
-        _gtkContext.Post(static arg =>
-        {
-            var (tcs, action) = (ValueTuple<TaskCompletionSource, Action>)arg!;
-            try
-            {
-                action();
-                tcs.TrySetResult();
-            }
-            catch (OperationCanceledException)
-            {
-                tcs.TrySetCanceled();
-            }
-            catch (Exception ex)
-            {
-                tcs.TrySetException(ex);
-            }
-        }, (tcs, action));
-        return tcs.Task;
+        return RunOnGlibThread(() => { _webView.StopLoading(); return true; }).GetAwaiter().GetResult();
     }
 }
 #endif

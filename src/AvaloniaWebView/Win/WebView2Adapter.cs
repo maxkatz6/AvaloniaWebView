@@ -61,7 +61,6 @@ internal class WebView2Adapter : IWebViewAdapter
 
     public event EventHandler<WebViewNavigationCompletedEventArgs>? NavigationCompleted;
     public event EventHandler<WebViewNavigationStartingEventArgs>? NavigationStarted;
-    public event EventHandler<WebViewNavigationWebPageRequestedEventArgs>? WebPageRequested;
     public event EventHandler? Initialized;
 
     public void Dispose()
@@ -143,28 +142,10 @@ internal class WebView2Adapter : IWebViewAdapter
             });
         }
         
-        webView.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.Document);
-        webView.WebResourceRequested += WebViewOnWebResourceRequested;
-        void WebViewOnWebResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs e)
-        {
-            WebPageRequested?.Invoke(this, new WebViewNavigationWebPageRequestedEventArgs(async ct =>
-            {
-                if (e.Request.Content is not null)
-                {
-                    return e.Request.Content;
-                }
-                return null;
-            })
-            {
-                Request = new Uri(e.Request.Uri)
-            });
-        }
-
         return () =>
         {
             webView.NavigationStarting -= WebViewOnNavigationStarting;
             webView.NavigationCompleted -= WebViewOnNavigationCompleted;
-            webView.WebResourceRequested -= WebViewOnWebResourceRequested;
         };
     }
 }

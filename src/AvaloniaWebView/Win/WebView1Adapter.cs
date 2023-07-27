@@ -69,7 +69,6 @@ internal sealed class WebView1Adapter : IWebViewAdapter
 
     public event EventHandler<WebViewNavigationCompletedEventArgs>? NavigationCompleted;
     public event EventHandler<WebViewNavigationStartingEventArgs>? NavigationStarted;
-    public event EventHandler<WebViewNavigationWebPageRequestedEventArgs>? WebPageRequested;
     public event EventHandler? Initialized;
 
     public bool GoBack()
@@ -155,29 +154,11 @@ internal sealed class WebView1Adapter : IWebViewAdapter
                 IsSuccess = e.IsSuccess
             });
         }
-        
-        webView.WebResourceRequested += WebViewOnWebResourceRequested;
-        void WebViewOnWebResourceRequested(object? sender, WebViewControlWebResourceRequestedEventArgs e)
-        {
-            WebPageRequested?.Invoke(this, new WebViewNavigationWebPageRequestedEventArgs(async ct =>
-            {
-                if (e.Request.Content is not null)
-                {
-                    var stream = await e.Request.Content.ReadAsInputStreamAsync().AsTask(ct);
-                    return stream.AsStreamForRead();
-                }
-                return null;
-            })
-            {
-                Request = e.Request.RequestUri
-            });
-        }
 
         return () =>
         {
             webView.NavigationStarting -= WebViewOnNavigationStarting;
             webView.NavigationCompleted -= WebViewOnNavigationCompleted;
-            webView.WebResourceRequested -= WebViewOnWebResourceRequested;
         };
     }
 

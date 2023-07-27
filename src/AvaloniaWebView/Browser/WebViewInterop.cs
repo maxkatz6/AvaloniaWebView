@@ -1,4 +1,4 @@
-﻿#if NET7_0_OR_GREATER
+﻿#if DISABLE
 using System;
 using System.Runtime.InteropServices.JavaScript;
 using System.Threading.Tasks;

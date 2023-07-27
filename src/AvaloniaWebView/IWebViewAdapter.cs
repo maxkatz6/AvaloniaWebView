@@ -1,10 +1,5 @@
 ﻿using System;
-using System.Diagnostics;
-using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
-using Avalonia;
-using Avalonia.Input;
 using Avalonia.Platform;
 
 namespace AvaloniaWebView;
@@ -17,21 +12,6 @@ public class WebViewNavigationEventArgs : EventArgs
 public class WebViewNavigationCompletedEventArgs : WebViewNavigationEventArgs
 {
     public bool IsSuccess { get; init; } = true;
-}
-
-public class WebViewNavigationWebPageRequestedEventArgs : WebViewNavigationEventArgs
-{
-    private readonly Func<CancellationToken, Task<Stream?>> _getStream;
-
-    public WebViewNavigationWebPageRequestedEventArgs(Func<CancellationToken, Task<Stream?>> getStream)
-    {
-        _getStream = getStream;
-    }
-
-    public Task<Stream?> GetResponseStreamAsync(CancellationToken cancellationToken)
-    {
-        return _getStream(cancellationToken);
-    }
 }
 
 public class WebViewNavigationStartingEventArgs : WebViewNavigationEventArgs
@@ -55,12 +35,7 @@ internal interface IWebView
     /// NavigationStarting dispatches before a new navigate starts for the top level document.
     /// </summary>
     event EventHandler<WebViewNavigationStartingEventArgs>? NavigationStarted;
-
-    /// <summary>
-    /// WebPageRequested dispatches when an HTTP request has been made.
-    /// </summary>
-    event EventHandler<WebViewNavigationWebPageRequestedEventArgs>? WebPageRequested;
-
+    
     /// <summary>
     /// Returns true if the webview can navigate to a previous page in the navigation history via the <see cref="GoBack"/> method.
     /// If the underlying native control is not yet initialized or navigation is not supported, this property is false.
@@ -93,7 +68,7 @@ internal interface IWebView
     /// <summary>
     /// Executes the provided script in the top level document.
     /// </summary>
-    Task<string?> InvokeScript(string scriptName);
+    Task<string?> InvokeScript(string script);
 
     /// <summary>
     /// Causes a navigation of the top level document to the specified URI.
@@ -108,13 +83,13 @@ internal interface IWebView
     /// <summary>
     /// Reloads the top level document.
     /// </summary>
-    /// <returns>True if successfull. False if not supported.</returns>
+    /// <returns>True if successful. False if not supported.</returns>
     bool Refresh();
 
     /// <summary>
     /// Stops any in progress navigation.
     /// </summary>
-    /// <returns>True if successfull. False if not supported.</returns>
+    /// <returns>True if successful. False if not supported.</returns>
     bool Stop();
 }
 

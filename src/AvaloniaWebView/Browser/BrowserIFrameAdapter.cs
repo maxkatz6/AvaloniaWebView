@@ -1,4 +1,4 @@
-﻿#if NET7_0_OR_GREATER && !WINDOWS && !MACOS
+﻿#if DISABLE
 using System;
 using System.Runtime.InteropServices.JavaScript;
 using System.Runtime.Versioning;
@@ -60,7 +60,6 @@ namespace AvaloniaWebView.Browser
         public event EventHandler? Initialized;
         public event EventHandler<WebViewNavigationCompletedEventArgs>? NavigationCompleted;
         public event EventHandler<WebViewNavigationStartingEventArgs>? NavigationStarted;
-        public event EventHandler<WebViewNavigationWebPageRequestedEventArgs>? WebPageRequested;
 
         public bool GoBack() => WebViewInterop.GoBack(Object);
 

@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net7.0;net7.0-windows10.0.22621</TargetFrameworks>
+    <TargetFrameworks>net7.0;net7.0-windows10.0.22621;net7.0-macos</TargetFrameworks>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
@@ -22,8 +22,9 @@
   </ItemGroup>
 
   <!-- Unknown platform group (linux + browser) -->
-  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == ''">
-    <PackageReference Include="WebkitGtkSharp" Version="3.24.24.95" />
-    <PackageReference Include="Avalonia.Browser" Version="11.0" />
-  </ItemGroup>
+<!--  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == ''">-->
+<!--    <PackageReference Include="WebkitGtkSharp" Version="3.24.24.95" />-->
+<!--    <PackageReference Include="Avalonia.X11" Version="11.0" />-->
+<!--    <PackageReference Include="Avalonia.Browser" Version="11.0" />-->
+<!--  </ItemGroup>-->
 </Project>

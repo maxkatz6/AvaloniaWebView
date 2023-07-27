@@ -2,11 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Input;
 using Avalonia.Platform;
-using Avalonia.Threading;
-using AvaloniaWebView.Browser;
 
 namespace AvaloniaWebView;
 
@@ -21,8 +17,6 @@ public class NativeWebView : NativeControlHost, IWebView
 
     public event EventHandler<WebViewNavigationStartingEventArgs>? NavigationStarted;
     
-    public event EventHandler<WebViewNavigationWebPageRequestedEventArgs>? WebPageRequested;
-
     public static readonly StyledProperty<Uri?> SourceProperty = AvaloniaProperty.Register<NativeWebView, Uri?>(nameof(Source));
 
     public Uri? Source
@@ -83,20 +77,20 @@ public class NativeWebView : NativeControlHost, IWebView
             return base.CreateNativeControlCore(parent);
         }
 #elif MACOS
-        if (OperatingSystem.IsMacOS())
-        {
-            _webViewAdapter = new Mac.MacWebViewAdapter();
-        }
+        _webViewAdapter = new Mac.MacWebViewAdapter();
 #else
-        if (OperatingSystem.IsLinux())
-        {
-            _webViewAdapter = new Gtk.GtkWebView2Adapter();
-        }
-        else if (OperatingSystem.IsBrowser())
-        {
-            _webViewAdapter = new BrowserIFrameAdapter();
-        }
-        else
+        // if (OperatingSystem.IsLinux())
+        // {
+        //     new Gtk.GtkWebView2Adapter();
+        //
+        //     return base.CreateNativeControlCore(parent);
+        //     // _webViewAdapter = new Gtk.GtkWebView2Adapter();
+        // }
+        // else if (OperatingSystem.IsBrowser())
+        // {
+        //     _webViewAdapter = new BrowserIFrameAdapter();
+        // }
+        // else
         {
             return base.CreateNativeControlCore(parent);
         }
@@ -122,7 +116,6 @@ public class NativeWebView : NativeControlHost, IWebView
         {
             _webViewAdapter.NavigationStarted += WebViewAdapterOnNavigationStarted;
             _webViewAdapter.NavigationCompleted += WebViewAdapterOnNavigationCompleted;
-            _webViewAdapter.WebPageRequested += WebViewAdapterOnWebPageRequested;
         }
     }
 
@@ -136,17 +129,15 @@ public class NativeWebView : NativeControlHost, IWebView
         SetCurrentValue(SourceProperty, e.Request);
         NavigationCompleted?.Invoke(this, e);
     }
-
-    private void WebViewAdapterOnWebPageRequested(object? sender, WebViewNavigationWebPageRequestedEventArgs e)
-    {
-        WebPageRequested?.Invoke(this, e);
-    }
     
     private void WebViewAdapterOnInitialized(object? sender, EventArgs e)
     {
         var adapter = (IWebViewAdapter)sender!;
         adapter.Initialized -= WebViewAdapterOnInitialized;
-        adapter.Source = Source;
+        if (Source is not null)
+        {
+            adapter.Source = Source;
+        }
 
         _webViewReadyCompletion.TrySetResult();
     }
@@ -157,9 +148,9 @@ public class NativeWebView : NativeControlHost, IWebView
 
         if (change.Property == SourceProperty)
         {
-            if (_webViewAdapter is not null)
+            if (_webViewAdapter is { IsInitialized: true })
             {
-                _webViewAdapter.Source = change.GetNewValue<Uri>();
+                _webViewAdapter.Source = change.GetNewValue<Uri?>() ?? s_emptyPageLink;
             }
         }
         else if (change.Property == BoundsProperty)
@@ -178,12 +169,12 @@ public class NativeWebView : NativeControlHost, IWebView
         if (_webViewAdapter is not null)
         {
             _webViewReadyCompletion = new TaskCompletionSource();
-            _webViewAdapter.NavigationStarted -= WebViewAdapterOnNavigationStarted;
-            _webViewAdapter.NavigationCompleted -= WebViewAdapterOnNavigationCompleted;
-            _webViewAdapter.WebPageRequested -= WebViewAdapterOnWebPageRequested;
-            _webViewAdapter.Initialized -= WebViewAdapterOnInitialized;
-            (_webViewAdapter as IDisposable)?.Dispose();
+            var adapter = _webViewAdapter;
             _webViewAdapter = null;
+            adapter.NavigationStarted -= WebViewAdapterOnNavigationStarted;
+            adapter.NavigationCompleted -= WebViewAdapterOnNavigationCompleted;
+            adapter.Initialized -= WebViewAdapterOnInitialized;
+            adapter.Dispose();
         }
     }
 }
